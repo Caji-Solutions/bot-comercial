@@ -9,7 +9,8 @@ import { Header } from "@/components/landing/Header";
 import { HeroSection, HeroSectionRef } from "@/components/landing/HeroSection";
 import { ProductSection } from "@/components/landing/ProductSection";
 import { PricingSection } from "@/components/landing/PricingSection";
-import { InteractiveGridPattern } from "@/components/ui/interactive-grid-pattern";
+import React, { Suspense, lazy } from "react";
+const InteractiveGridPattern = lazy(() => import("@/components/ui/interactive-grid-pattern").then(module => ({ default: module.InteractiveGridPattern })));
 import Lenis from "lenis";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
@@ -81,7 +82,9 @@ const Landing = () => {
         <SmoothScrollProvider lenis={lenis || undefined}>
             <div style={{ fontFamily: "'Poppins', sans-serif" }} className="relative">
                 {/* Global Interactive Grid Pattern - Active in all phases */}
-                <InteractiveGridPattern className="fixed inset-0 opacity-100 z-0" />
+                <Suspense fallback={null}>
+                    <InteractiveGridPattern className="fixed inset-0 opacity-100 z-0" />
+                </Suspense>
 
                 <Header
                     phase={phase}

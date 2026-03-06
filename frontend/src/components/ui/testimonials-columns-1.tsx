@@ -1,6 +1,5 @@
 "use client";
 import React from "react";
-import { motion } from "framer-motion";
 
 export interface Testimonial {
     text: string;
@@ -14,19 +13,15 @@ export const TestimonialsColumn = (props: {
     testimonials: Testimonial[];
     duration?: number;
 }) => {
+    const duration = props.duration || 10;
+
     return (
         <div className={props.className}>
-            <motion.div
-                animate={{
-                    translateY: "-50%",
+            <div
+                className="testimonials-scroll flex flex-col gap-6 pb-6"
+                style={{
+                    animationDuration: `${duration}s`,
                 }}
-                transition={{
-                    duration: props.duration || 10,
-                    repeat: Infinity,
-                    ease: "linear",
-                    repeatType: "loop",
-                }}
-                className="flex flex-col gap-6 pb-6"
             >
                 {[
                     ...new Array(2).fill(0).map((_, index) => (
@@ -41,6 +36,7 @@ export const TestimonialsColumn = (props: {
                                             src={image}
                                             alt={name}
                                             className="h-10 w-10 rounded-full object-cover"
+                                            loading="lazy"
                                         />
                                         <div className="flex flex-col">
                                             <div className="font-medium tracking-tight leading-5">{name}</div>
@@ -52,7 +48,17 @@ export const TestimonialsColumn = (props: {
                         </React.Fragment>
                     )),
                 ]}
-            </motion.div>
+            </div>
+            <style>{`
+                .testimonials-scroll {
+                    animation: testimonials-scroll-up var(--duration, 10s) linear infinite;
+                    animation-duration: inherit;
+                }
+                @keyframes testimonials-scroll-up {
+                    from { transform: translateY(0); }
+                    to { transform: translateY(-50%); }
+                }
+            `}</style>
         </div>
     );
 };

@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, useCallback } from "react";
 import { cn } from "@/lib/utils";
 
 interface InteractiveGridPatternProps {
@@ -16,62 +16,72 @@ export function InteractiveGridPattern({
 }: InteractiveGridPatternProps) {
     const [squares, setSquares] = useState<Array<{ x: number; y: number; id: number }>>([]);
     const containerRef = useRef<HTMLDivElement>(null);
-    // Track mouse position globally to handle scroll updates
-    const mousePosRef = useRef<{ x: number; y: number } | null>(null);
+    const lastUpdateRef = useRef(0);
+    const rafCleanupRef = useRef<number | null>(null);
+    const squaresRef = useRef(squares);
+    squaresRef.current = squares;
 
-    useEffect(() => {
+    // Throttled square updater — max 1 update every 150ms
+    const updateSquare = useCallback((clientX: number, clientY: number) => {
+        const now = Date.now();
+        if (now - lastUpdateRef.current < 150) return;
+        lastUpdateRef.current = now;
+
         const container = containerRef.current;
         if (!container) return;
 
-        const updateSquare = (x: number, y: number) => {
-            const rect = container.getBoundingClientRect();
-            // Calculate relative coordinates
-            const relX = x - rect.left;
-            const relY = y - rect.top;
+        const rect = container.getBoundingClientRect();
+        const relX = clientX - rect.left;
+        const relY = clientY - rect.top;
 
-            // Check if mouse is actually inside the container
-            if (relX < 0 || relY < 0 || relX > rect.width || relY > rect.height) {
-                return;
-            }
+        if (relX < 0 || relY < 0 || relX > rect.width || relY > rect.height) return;
 
-            const col = Math.floor(relX / width);
-            const row = Math.floor(relY / height);
+        const newX = Math.floor(relX / width) * width;
+        const newY = Math.floor(relY / height) * height;
 
-            const newX = col * width;
-            const newY = row * height;
+        setSquares((prev) => {
+            // Avoid duplicates
+            if (prev.some(s => s.x === newX && s.y === newY && now - s.id < 150)) return prev;
+            // Cap at 20 squares max to limit DOM nodes
+            const updated = [...prev, { x: newX, y: newY, id: now }];
+            return updated.length > 20 ? updated.slice(-20) : updated;
+        });
+    }, [width, height]);
 
-            setSquares((prev) => {
-                // Check if this specific square is already active (to avoid duplicates/flicker)
-                const exists = prev.find(s => s.x === newX && s.y === newY && Date.now() - s.id < 100);
-                if (exists) return prev;
-
-                return [...prev, { x: newX, y: newY, id: Date.now() }];
-            });
-        };
-
+    useEffect(() => {
         const handleMouseMove = (e: MouseEvent) => {
-            mousePosRef.current = { x: e.clientX, y: e.clientY };
             updateSquare(e.clientX, e.clientY);
         };
 
-        window.addEventListener("mousemove", handleMouseMove);
+        window.addEventListener("mousemove", handleMouseMove, { passive: true });
+        return () => window.removeEventListener("mousemove", handleMouseMove);
+    }, [updateSquare]);
+
+    // RAF-based cleanup instead of setInterval
+    useEffect(() => {
+        let lastCleanup = 0;
+
+        const cleanup = (time: number) => {
+            // Only run cleanup every 500ms instead of 100ms
+            if (time - lastCleanup > 500) {
+                lastCleanup = time;
+                const now = Date.now();
+                setSquares((prev) => {
+                    const filtered = prev.filter(s => now - s.id < 1000);
+                    // Skip update if nothing changed
+                    return filtered.length === prev.length ? prev : filtered;
+                });
+            }
+            rafCleanupRef.current = requestAnimationFrame(cleanup);
+        };
+
+        rafCleanupRef.current = requestAnimationFrame(cleanup);
 
         return () => {
-            window.removeEventListener("mousemove", handleMouseMove);
+            if (rafCleanupRef.current !== null) {
+                cancelAnimationFrame(rafCleanupRef.current);
+            }
         };
-    }, [width, height]);
-
-    // Timer to clean up old squares
-    useEffect(() => {
-        const interval = setInterval(() => {
-            setSquares((prev) => {
-                const now = Date.now();
-                // Remove squares older than 2 seconds (adjust duration as needed)
-                return prev.filter(s => now - s.id < 1000);
-            });
-        }, 100);
-
-        return () => clearInterval(interval);
     }, []);
 
     return (
@@ -115,7 +125,6 @@ export function InteractiveGridPattern({
                     </style>
                 </defs>
 
-                {/* Trail Rects */}
                 {/* Trail Rects */}
                 {squares.map(({ x, y, id }) => (
                     <rect

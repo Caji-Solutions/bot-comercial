@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import Lottie from "lottie-react";
+import { useState, useEffect, useRef } from "react";
+import Lottie, { LottieRefCurrentProps } from "lottie-react";
 import {
     SiFacebook,
     SiInstagram,
@@ -30,6 +30,9 @@ const iconConfigs = [
 
 export const IntegrationsAnimation = () => {
     const [lottieData, setLottieData] = useState<any>(null);
+    const [isVisible, setIsVisible] = useState(false);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const lottieRef = useRef<LottieRefCurrentProps | null>(null);
 
     useEffect(() => {
         fetch("/lotties/meta-ai-logo.json")
@@ -38,14 +41,40 @@ export const IntegrationsAnimation = () => {
             .catch(err => console.error("Error loading lottie:", err));
     }, []);
 
+    // Viewport-aware: pause Lottie + CSS animations when off-screen
+    useEffect(() => {
+        const el = containerRef.current;
+        if (!el) return;
+
+        const observer = new IntersectionObserver(
+            ([entry]) => {
+                setIsVisible(entry.isIntersecting);
+                if (entry.isIntersecting) {
+                    lottieRef.current?.play();
+                } else {
+                    lottieRef.current?.pause();
+                }
+            },
+            { threshold: 0.1 }
+        );
+        observer.observe(el);
+        return () => observer.disconnect();
+    }, [lottieData]);
+
     return (
-        <div className="w-full h-full flex items-center justify-center p-4 min-h-[350px] overflow-hidden">
+        <div ref={containerRef} className="w-full h-full flex items-center justify-center p-4 min-h-[350px] overflow-hidden">
             <div className="relative flex items-center justify-center">
 
                 {/* Central Hub - Lottie */}
                 <div className="z-20 w-28 h-28 flex items-center justify-center relative">
                     {lottieData ? (
-                        <Lottie animationData={lottieData} loop={true} className="w-full h-full transform scale-125" />
+                        <Lottie
+                            lottieRef={lottieRef}
+                            animationData={lottieData}
+                            loop={true}
+                            autoplay={false}
+                            className="w-full h-full transform scale-125"
+                        />
                     ) : (
                         <div className="w-full h-full bg-slate-100 animate-pulse rounded-full" />
                     )}
@@ -55,8 +84,8 @@ export const IntegrationsAnimation = () => {
                 {iconConfigs.map((orbitIcons, orbitIndex) => {
                     const baseOrbitSize = 200 + (orbitIndex * 120);
                     const orbitSize = typeof window !== 'undefined' && window.innerWidth < 768 ? baseOrbitSize * 0.7 : baseOrbitSize;
-                    const duration = 25 + (orbitIndex * 10); // Different speeds
-                    const reverse = orbitIndex % 2 === 1; // Alternate direction
+                    const duration = 25 + (orbitIndex * 10);
+                    const reverse = orbitIndex % 2 === 1;
 
                     return (
                         <div
@@ -65,7 +94,10 @@ export const IntegrationsAnimation = () => {
                             style={{
                                 width: orbitSize,
                                 height: orbitSize,
-                                animation: `spin ${duration}s linear infinite ${reverse ? 'reverse' : ''}`
+                                animation: `integrations-spin ${duration}s linear infinite ${reverse ? 'reverse' : ''}`,
+                                animationPlayState: isVisible ? 'running' : 'paused',
+                                willChange: 'transform',
+                                contain: 'layout style',
                             }}
                         >
                             {orbitIcons.map((config, iconIndex) => {
@@ -86,7 +118,9 @@ export const IntegrationsAnimation = () => {
                                                 style={{
                                                     width: 40,
                                                     height: 40,
-                                                    animation: `spin ${duration}s linear infinite ${reverse ? 'normal' : 'reverse'}`
+                                                    animation: `integrations-spin ${duration}s linear infinite ${reverse ? 'normal' : 'reverse'}`,
+                                                    animationPlayState: isVisible ? 'running' : 'paused',
+                                                    willChange: 'transform',
                                                 }}
                                             >
                                                 <config.Icon size={20} style={{ color: config.color }} />
@@ -101,7 +135,7 @@ export const IntegrationsAnimation = () => {
             </div>
 
             <style>{`
-                @keyframes spin {
+                @keyframes integrations-spin {
                     from { transform: rotate(0deg); }
                     to { transform: rotate(360deg); }
                 }

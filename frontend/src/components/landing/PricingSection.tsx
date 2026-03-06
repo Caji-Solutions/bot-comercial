@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { PricingWrapper, Heading, Price } from "@/components/ui/animated-pricing-cards";
 import { Calendar, MessageSquare, Mic, ShieldCheck } from "lucide-react";
 import { STRIPE_CONFIG, PRICING_DISPLAY } from "@/constants/pricing";
@@ -9,6 +9,8 @@ export const PricingSection = () => {
     const [displayPeriod, setDisplayPeriod] = useState<'monthly' | 'semiannual' | 'annual'>('annual');
     const [cardRotation, setCardRotation] = useState(0);
     const [isMobile, setIsMobile] = useState(false);
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const sectionRef = useRef<HTMLElement>(null);
 
     useEffect(() => {
         const checkMobile = () => setIsMobile(window.innerWidth < 768);
@@ -16,6 +18,26 @@ export const PricingSection = () => {
         window.addEventListener('resize', checkMobile);
         return () => window.removeEventListener('resize', checkMobile);
     }, []);
+
+    // Viewport-aware video play/pause
+    useEffect(() => {
+        const el = sectionRef.current;
+        const video = videoRef.current;
+        if (!el || !video || isMobile) return;
+
+        const observer = new IntersectionObserver(
+            ([entry]) => {
+                if (entry.isIntersecting) {
+                    video.play().catch(() => { });
+                } else {
+                    video.pause();
+                }
+            },
+            { threshold: 0.1 }
+        );
+        observer.observe(el);
+        return () => observer.disconnect();
+    }, [isMobile]);
 
     const handleToggle = (period: 'monthly' | 'semiannual' | 'annual') => {
         if (pricingPeriod === period) return;
@@ -31,7 +53,7 @@ export const PricingSection = () => {
     };
 
     return (
-        <section id="pricing" className="relative min-h-screen flex flex-col justify-center px-4 md:px-12 overflow-hidden py-12 md:py-0">
+        <section ref={sectionRef} id="pricing" className="relative min-h-screen flex flex-col justify-center px-4 md:px-12 overflow-hidden py-12 md:py-0">
             {/* Sticker Container - Rounded with margins */}
             <div
                 className="relative w-full max-w-full md:max-w-[80%] mx-auto h-full min-h-[40vh] md:min-h-[80vh] overflow-hidden flex flex-col"
@@ -65,10 +87,11 @@ export const PricingSection = () => {
                                 }}
                             >
                                 <video
-                                    autoPlay
+                                    ref={videoRef}
                                     loop
                                     muted
                                     playsInline
+                                    preload="none"
                                     className="w-full h-full object-cover"
                                     style={{ display: "block" }}
                                 >

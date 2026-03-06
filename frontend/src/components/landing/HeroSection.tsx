@@ -776,19 +776,12 @@ export const HeroSection = forwardRef<HeroSectionRef, HeroSectionProps>(({ phase
                 </p>
 
                 {/* Botões CTA */}
-                <div className="flex flex-nowrap gap-3 md:gap-4 mt-5 md:mt-8 pointer-events-auto">
+                <div className="flex justify-center w-full mt-5 md:mt-8 pointer-events-auto">
                     <Button
                         onClick={executeSkipToPricing}
-                        className="bg-[#00A947] text-white hover:bg-[#00A947]/90 font-semibold px-4 py-4 md:px-8 md:py-6 text-base md:text-lg rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-105 whitespace-nowrap"
+                        className="bg-[#00A947] text-white hover:bg-[#00A947]/90 font-semibold px-6 py-4 md:px-8 md:py-6 text-base md:text-lg rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-105 whitespace-nowrap"
                     >
                         Começar Agora
-                    </Button>
-                    <Button
-                        variant="outline"
-                        onClick={() => window.location.href = '/sua-experiencia'}
-                        className="border-2 border-[#1E293B] text-[#1E293B] hover:bg-[#1E293B] hover:text-white font-semibold px-4 py-4 md:px-8 md:py-6 text-base md:text-lg rounded-full transition-all whitespace-nowrap"
-                    >
-                        Ver Como Funciona
                     </Button>
                 </div>
             </div>

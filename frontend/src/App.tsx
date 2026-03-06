@@ -33,6 +33,7 @@ import PublicRoute from "./components/PublicRoute";
 const YourExperiencePage = lazy(() => import("./pages/YourExperiencePage"));
 import { CookieConsentProvider } from "@/contexts/CookieConsentContext";
 import { CookieConsentBanner } from "@/components/ui/CookieConsentBanner";
+import { FloatingActionButton } from "@/components/FloatingActionButton";
 
 const queryClient = new QueryClient();
 
@@ -58,6 +59,7 @@ const App = () => (
           <CookieConsentBanner />
           <LiaVolumeProvider>
             <BrowserRouter>
+              <FloatingActionButton />
               <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-slate-50">Carregando...</div>}>
                 <Routes>
                   {/* Rotas publicas - sem Socket/Integrations */}

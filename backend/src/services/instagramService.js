@@ -126,6 +126,9 @@ export const handleCallback = async (connectionId) => {
 // ---------------------
 // 4. getUserInfo
 // ---------------------
+// ---------------------
+// 4. getUserInfo
+// ---------------------
 export const getUserInfo = async (connectionId) => {
     if (!connectionId) {
         return null;
@@ -141,7 +144,16 @@ export const getUserInfo = async (connectionId) => {
             }
         );
 
-        return result.successful ? result.data : null;
+        if (result.successful) {
+            return result.data;
+        }
+
+        console.warn(`⚠️ INSTAGRAM_GET_USER_INFO failed for ${connectionId}: ${result.error}`);
+
+        // Fallback: Try with user_id='me' if the tool supports it or simpler call
+        // For now, return null but log explicitly so we know it failed
+        return null;
+
     } catch (error) {
         console.error('Instagram Get User Info Error:', error.message);
         return null;
@@ -230,6 +242,8 @@ export const getConnectionStatus = async (userId) => {
         if (!activeAccount) {
             return { isConnected: false };
         }
+
+        console.log(`🔍 Debug Active Account: ${JSON.stringify(activeAccount, null, 2)}`);
 
         let igUserId = activeAccount.metadata?.igUserId || activeAccount.remoteId || null;
         let username = activeAccount.metadata?.username || null;
@@ -390,6 +404,19 @@ export const sendDM = async (userId, recipientId, text) => {
 
             return { success: true, messageId: result.data?.id };
         } else {
+            // Log detailed error for debugging
+            console.warn(`⚠️ Failed to send DM to ${recipientId}: ${JSON.stringify(result.error)}`);
+
+            // Check for specific error codes
+            // Error 10 / Subcode 2534022: "This message is sent outside of allowed window"
+            if (JSON.stringify(result.error).includes('2534022')) {
+                return {
+                    success: false,
+                    error: 'WINDOW_CLOSED',
+                    details: 'Message sent outside of allowed 24h window. User must initiate contact.'
+                };
+            }
+
             return { success: false, error: result.error || 'Failed to send DM' };
         }
     } catch (error) {
@@ -603,6 +630,10 @@ export const startPolling = (userId, intervalMs = 15000) => {
     let isPollingProcessing = false;
     const pollingStartTime = Math.floor(Date.now() / 1000); // Unix timestamp in seconds
 
+    // Cache specific user info for echo prevention
+    let cachedIgUserId = null;
+    let cachedIgUsername = null;
+
     console.log(`🔄 Starting Instagram polling for ${userId} (every ${intervalMs / 1000}s)`);
 
     const poll = async () => {
@@ -641,11 +672,16 @@ export const startPolling = (userId, intervalMs = 15000) => {
 
             // 1. Try to get ID from connection status (live)
             // 2. Fallback to DB persisted ID
-            let myIgUserId = status.igUserId || igConnection?.instagramUserId;
+            // 3. Fallback to local cache from previous successful polls
+            let myIgUserId = status.igUserId || igConnection?.instagramUserId || cachedIgUserId;
+            let myUsername = status.username || igConnection?.instagramUsername || cachedIgUsername;
 
             // If we have a live ID but not in DB, persist it now for robustness
             if (status.igUserId && status.connectionId && (!igConnection?.instagramUserId || igConnection.instagramUserId !== status.igUserId)) {
                 await ensureInstagramUserIdPersisted(userId, status.connectionId, status.igUserId, status.username);
+                // Update local cache
+                cachedIgUserId = status.igUserId;
+                cachedIgUsername = status.username;
             }
 
             if (!myIgUserId) {
@@ -752,20 +788,29 @@ export const startPolling = (userId, intervalMs = 15000) => {
                     const senderId = msg.from?.id || msg.sender_id || msg.participant_id;
 
                     // ECHO DETECTION & PREVENTION (Robust)
-                    // 1. Check against `myIgUserId` (from Live API or DB)
-                    if (myIgUserId && String(senderId) === String(myIgUserId)) {
-                        console.log(`[Instagram] ⏩ Skipping own message (ID Match: ${senderId})`);
+                    const senderIdString = String(senderId);
+
+                    // 1. Check against `myIgUserId` (from Live API, DB or Cache)
+                    if (myIgUserId && senderIdString === String(myIgUserId)) {
+                        // console.log(`[Instagram] ⏩ Skipping own message (ID Match: ${senderId})`);
                         continue;
                     }
 
                     // 2. Check against `status.igUserId` explicitly if different
-                    if (status.igUserId && String(senderId) === String(status.igUserId)) {
-                        console.log(`[Instagram] ⏩ Skipping own message (Live ID Match: ${senderId})`);
+                    if (status.igUserId && senderIdString === String(status.igUserId)) {
+                        // console.log(`[Instagram] ⏩ Skipping own message (Live ID Match: ${senderId})`);
                         continue;
                     }
 
-                    // 3. (Optional) Check against cached known bot IDs if you have them
-                    // ...
+                    // 3. Check against USERNAME if ID check fails (Fallback)
+                    // Sometimes senderId is the username in some API versions? Unlikely but good safety.
+                    if (myUsername && (senderIdString === myUsername || (msg.sender_username && msg.sender_username === myUsername))) {
+                        console.log(`[Instagram] ⏩ Skipping own message (Username Match: ${myUsername})`);
+                        continue;
+                    }
+
+                    // 4. Heuristic: If we just sent a message to this conversation, it might be an echo
+                    // (This is harder to track perfectly without more state, but let's rely on IDs for now)
 
                     // Extract message text - Instagram API returns it in 'message' field
                     const messageText = msg.message || msg.text || msg.message?.text || msg.content || '';
